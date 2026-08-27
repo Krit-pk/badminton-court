@@ -1,0 +1,125 @@
+:root {
+    --bg-dark: #222222;
+    --panel-grey: #D9D9D9;
+    --brand-teal: #185A52;
+    --brand-teal-hover: #12453F;
+    --text-white: #FFFFFF;
+    --text-dark: #222222;
+    --danger-red: #D93838;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Kanit', sans-serif; }
+body { background-color: var(--bg-dark); height: 100vh; width: 100vw; overflow: hidden; }
+.page-viewport { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+
+#loginPage { justify-content: center; align-items: center; background-color: var(--bg-dark); }
+.login-box { background-color: var(--text-white); padding: 36px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+.login-box h2 { color: var(--brand-teal); text-align: center; margin-bottom: 20px; }
+.login-hint { font-size: 12px; color: #666; margin-bottom: 16px; }
+
+.input-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.input-group label { font-size: 14px; font-weight: 600; color: var(--text-dark); }
+.input-group input { padding: 10px; border: 1px solid #CCC; border-radius: 6px; font-size: 14px; }
+
+.submit-btn { width: 100%; padding: 10px; background-color: var(--brand-teal); color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; }
+
+.header { height: 70px; padding: 0 40px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.green-header { background-color: var(--brand-teal); color: var(--text-white); }
+.black-header { background-color: #000000; color: var(--text-white); }
+
+.user-info { display: flex; align-items: center; gap: 16px; font-size: 15px; }
+.admin-btn, .user-btn, .logout-btn { padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; border: none; font-weight: 500; }
+.admin-btn { background-color: #000000; color: var(--text-white); }
+.user-btn { background-color: var(--brand-teal); color: var(--text-white); }
+.logout-btn { background-color: var(--danger-red); color: var(--text-white); }
+
+.content-viewport { flex: 1; background-color: var(--panel-grey); padding: 30px; display: flex; justify-content: center; align-items: center; overflow: auto; }
+.court-grid-fullscreen { display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); gap: 24px; width: 100%; height: 100%; max-width: 1200px; max-height: 800px; }
+.court-card { background-color: var(--brand-teal); color: var(--text-white); border-radius: 16px; display: flex; justify-content: center; align-items: center; font-size: 36px; font-weight: 600; cursor: pointer; transition: transform 0.2s; }
+.court-card:hover { background-color: var(--brand-teal-hover); transform: scale(1.02); }
+
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.65); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(3px); }
+.modal-content { background-color: var(--brand-teal); color: var(--text-white); width: 90%; max-width: 760px; max-height: 90vh; border-radius: 16px; padding: 24px 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); overflow-y: auto; }
+.modal-content h2 { text-align: center; font-size: 32px; margin-bottom: 4px; }
+.modal-subtitle { text-align: center; font-size: 13px; color: rgba(255,255,255,0.7); margin-bottom: 20px; }
+
+.queue-list { display: flex; flex-direction: column; gap: 14px; }
+.queue-item { display: flex; flex-direction: column; gap: 8px; background: rgba(0, 0, 0, 0.2); padding: 14px 16px; border-radius: 12px; }
+.queue-header { display: flex; justify-content: space-between; align-items: center; }
+.queue-label { font-size: 16px; font-weight: 600; }
+
+.timer-badge {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #FFD700;
+    font-weight: 500;
+    font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.timer-badge .time-num {
+    font-family: inherit;
+    font-weight: 700;
+}
+
+.finish-game-btn {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: var(--text-white);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-left: 8px;
+    transition: all 0.2s;
+}
+
+.finish-game-btn:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+}
+
+.finish-game-btn.voted {
+    background-color: #22C55E;
+    color: #FFFFFF;
+    border-color: #22C55E;
+}
+
+.match-row { display: flex; align-items: center; gap: 8px; }
+.player { background-color: var(--text-white); color: var(--text-dark); flex: 1; padding: 8px 4px; border-radius: 8px; text-align: center; font-size: 14px; font-weight: 600; min-height: 42px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; position: relative; }
+.player.empty { background-color: rgba(255, 255, 255, 0.12); color: rgba(255, 255, 255, 0.75); font-weight: normal; cursor: pointer; border: 1px dashed rgba(255, 255, 255, 0.3); }
+.player.empty:hover { background-color: rgba(255, 255, 255, 0.25); color: #FFFFFF; }
+
+.player.my-slot {
+    background-color: #E0F2FE;
+    color: #0369A1;
+    border: 2px solid #38BDF8;
+    cursor: pointer;
+}
+
+.player.my-slot:hover {
+    background-color: #FEE2E2;
+    color: #DC2626;
+    border-color: #EF4444;
+}
+
+.player-leave-icon {
+    margin-left: 6px;
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+.delete-btn { background-color: var(--danger-red); color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-left: 8px; }
+.colon { font-size: 20px; font-weight: bold; padding: 0 2px; }
+.close-btn { width: 100%; margin-top: 20px; padding: 10px; background-color: rgba(0, 0, 0, 0.3); color: var(--text-white); border: none; border-radius: 8px; cursor: pointer; font-size: 16px; }
+
+.admin-panel-fullscreen { background-color: var(--text-white); border-radius: 12px; padding: 30px; width: 100%; height: 100%; max-width: 1200px; color: var(--text-dark); display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+.admin-court-item { border-bottom: 1px solid #E0E0E0; padding-bottom: 12px; }
+.admin-court-item h3 { font-size: 18px; color: var(--brand-teal); margin-bottom: 6px; }
+.admin-queue-row { font-size: 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+
+.hidden { display: none !important; }

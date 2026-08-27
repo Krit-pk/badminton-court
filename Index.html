@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจองคอร์ทแบดมินตัน</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+
+    <!-- สคริปต์เชื่อมต่อ Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body>
+
+    <!-- หน้าเข้าสู่ระบบ -->
+    <div id="loginPage" class="page-viewport">
+        <div class="login-box">
+            <h2>เข้าสู่ระบบจองคอร์ท</h2>
+            <div class="input-group">
+                <label>ชื่อผู้ใช้งาน (Username)</label>
+                <input type="text" id="loginUsername" placeholder="กรอกชื่อผู้ใช้ เช่น user1">
+            </div>
+            <div class="input-group">
+                <label>รหัสผ่าน (Password)</label>
+                <input type="password" id="loginPassword" placeholder="รหัสผ่าน (ใช้ 1234 หรือ admin)">
+            </div>
+            <p class="login-hint">* ผู้ใช้ทั่วไปใช้ รหัสผ่าน: 1234 | Admin ใช้: admin/admin</p>
+            <button class="submit-btn" onclick="handleLogin()">เข้าสู่ระบบ</button>
+        </div>
+    </div>
+
+    <!-- หน้าหลักผู้ใช้ -->
+    <div id="userPage" class="page-viewport hidden">
+        <header class="header green-header">
+            <h1>จองคอร์ท</h1>
+            <div class="user-info">
+                <span>ผู้ใช้: <strong id="currentUserDisplay">-</strong></span>
+                <button class="admin-btn hidden" id="adminNavBtn" onclick="goToAdmin()">Admin</button>
+                <button class="logout-btn" onclick="handleLogout()">ออกจากระบบ</button>
+            </div>
+        </header>
+
+        <main class="content-viewport">
+            <div class="court-grid-fullscreen">
+                <div class="court-card" onclick="openPopup('คอร์ท 1')">คอร์ท 1</div>
+                <div class="court-card" onclick="openPopup('คอร์ท 2')">คอร์ท 2</div>
+                <div class="court-card" onclick="openPopup('คอร์ท 3')">คอร์ท 3</div>
+                <div class="court-card" onclick="openPopup('คอร์ท 4')">คอร์ท 4</div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ป๊อปอัพแสดงคิวจอง -->
+    <div id="courtModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2 id="modalTitle">คอร์ท 1</h2>
+            <p class="modal-subtitle">คลิกที่ช่องว่างเพื่อลงชื่อจองด้วยบัญชีของคุณ</p>
+            <div class="queue-list" id="queueListContainer"></div>
+            <button class="close-btn" onclick="closePopup()">ปิดหน้าต่าง</button>
+        </div>
+    </div>
+
+    <!-- หน้า Admin -->
+    <div id="adminPage" class="page-viewport hidden">
+        <header class="header black-header">
+            <h1>Admin Management</h1>
+            <button class="user-btn" onclick="goToUser()">กลับหน้าจอง</button>
+        </header>
+
+        <main class="content-viewport">
+            <div class="admin-panel-fullscreen" id="adminPanelContainer"></div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
