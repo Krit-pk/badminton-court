@@ -1,3 +1,66 @@
+// ==========================================
+// 📍 1. กำหนดพิกัดสนามแบดมินตัน และระบบตรวจเช็กระยะทาง (Geofencing)
+// ==========================================
+const COURT_LOCATION = {
+    lat: 7.203006610774002,   // พิกัดละติจูดสนามของคุณ
+    lng: 100.60069610167278,  // พิกัดลองจิจูดสนามของคุณ
+    radiusMeters: 100         // << กำหนดระยะรัศมีที่อนุญาตให้จองได้ (หน่วย: เมตร)
+};
+
+// ฟังก์ชันคำนวณระยะห่างระหว่าง 2 จุดบนโลก (Haversine Formula) คืนค่าเป็นเมตร
+function getDistanceInMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // รัศมีของโลก (เมตร)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; 
+}
+
+// ฟังก์ชันดึงพิกัดจริงจากอุปกรณ์ผ่าน HTML5 Geolocation API
+function getUserLocation() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error("อุปกรณ์หรือเบราว์เซอร์ของคุณไม่รองรับการดึงพิกัดตำแหน่ง (Geolocation API)"));
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                resolve({
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                });
+            },
+            (error) => {
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        reject(new Error("กรุณาเปิดการอนุญาตเข้าถึงตำแหน่ง (Location Access) ในเบราว์เซอร์ก่อนทำการจอง"));
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        reject(new Error("ไม่สามารถค้นหาตำแหน่งของคุณได้"));
+                        break;
+                    case error.TIMEOUT:
+                        reject(new Error("หมดเวลาในการดึงตำแหน่ง"));
+                        break;
+                    default:
+                        reject(new Error("เกิดข้อผิดพลาดในการดึงตำแหน่ง"));
+                }
+            },
+            {
+                enableHighAccuracy: true, // ใช้ GPS ความแม่นยำสูง
+                timeout: 10000,           // หมดเวลาใน 10 วินาที
+                maximumAge: 0
+            }
+        );
+    });
+}
+
+// ==========================================
+// ⚙️ 2. ส่วนตั้งค่า Firebase และตัวแปรระบบเดิม
+// ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyCD0a9pLD1_1h1umN6vUBgArBHe8aO4Bwg",
   authDomain: "jongcourt-42aeb.firebaseapp.com",
@@ -193,7 +256,6 @@ function clearUserBookingOnLogout(username) {
     }
 }
 
-// สั่งล้างการล็อกอินในฝั่งเครื่องที่โดนเตะ
 function forceClientLogout() {
     localStorage.removeItem('badminton_user');
     currentUser = null;
@@ -217,17 +279,12 @@ function handleLogout() {
     forceClientLogout();
 }
 
-// Admin สั่งเตะผู้ใช้งาน ลบออกจากคอร์ด ลบออกจากออนไลน์ และส่งคำสั่ง Force Logout
 function kickSingleActiveUser(usernameKey, displayName) {
     if (confirm(`คุณต้องการเตะผู้ใช้ "${displayName}" ออกจากระบบใช่หรือไม่?`)) {
-        // 1. ถอนสิทธิ์การจองคิวในทุกคอร์ท
         clearUserBookingOnLogout(displayName);
 
         if (useFirebase && db) {
-            // 2. ลบออกจาก Active Users
             db.ref(`active_users/${usernameKey}`).remove();
-            
-            // 3. ส่งสัญญาณเตะไปยังเครื่องผู้ใช้
             db.ref('kicked_user').set(displayName);
         }
 
@@ -424,7 +481,10 @@ function getUserExistingBooking(username) {
     return null;
 }
 
-function slotClick(queueIndex, slotIndex) {
+// ==========================================
+// 📍 3. ฟังก์ชันคลิกจองช่อง (เพิ่มระบบตรวจเช็กพิกัดแล้ว)
+// ==========================================
+async function slotClick(queueIndex, slotIndex) {
     if (currentUser && currentUser.isAdmin) {
         alert('บัญชี Admin มีไว้สำหรับดูแลและตรวจสอบระบบเท่านั้น ไม่สามารถลงจองเล่นได้');
         return;
@@ -435,6 +495,7 @@ function slotClick(queueIndex, slotIndex) {
 
     const currentPlayerInSlot = queue.players[slotIndex];
 
+    // ถ้ากดที่ช่องตัวเอง ให้กดออกจากคิวได้เลย (ไม่ต้องเช็ก GPS)
     if (currentPlayerInSlot && currentPlayerInSlot.toLowerCase() === currentUser.username.toLowerCase()) {
         if (confirm(`คุณต้องการออกจากคิวที่ ${queueIndex + 1} ใช่หรือไม่?`)) {
             removeSinglePlayer(currentSelectedCourt, queueIndex, slotIndex);
@@ -442,7 +503,23 @@ function slotClick(queueIndex, slotIndex) {
         return;
     }
 
+    // ถ้าเป็นช่องของผู้อื่น ไม่ให้ทำอะไร
     if (currentPlayerInSlot !== '') {
+        return;
+    }
+
+    // 🔒 [เช็กพิกัด GPS] ก่อนทำการกดจองคิวใหม่
+    try {
+        const userLoc = await getUserLocation();
+        const distance = getDistanceInMeters(userLoc.lat, userLoc.lng, COURT_LOCATION.lat, COURT_LOCATION.lng);
+        const distanceRounded = Math.round(distance);
+
+        if (distance > COURT_LOCATION.radiusMeters) {
+            alert(`❌ คุณไม่อยู่ในบริเวณสนาม!\n\nตำแหน่งของคุณอยู่ห่างออกไปประมาณ ${distanceRounded} เมตร\n(ต้องอยู่ในระยะไม่เกิน ${COURT_LOCATION.radiusMeters} เมตร เท่านั้นจึงจะจองคิวได้)`);
+            return;
+        }
+    } catch (error) {
+        alert(`❌ ไม่สามารถตรวจสอบตำแหน่งของคุณได้:\n${error.message}`);
         return;
     }
 
