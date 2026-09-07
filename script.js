@@ -12,6 +12,16 @@ const firebaseConfig = {
 let db = null;
 let useFirebase = false;
 
+// ===============================
+// GPS LOCATION SETTINGS
+// ===============================
+
+const COURT_LAT = 7.203050248572355;
+const COURT_LNG = 100.60064801964711;
+
+// อนุญาตให้ใช้งานภายในระยะ 50 เมตรจากสนาม
+const ALLOWED_RADIUS = 50;
+
 try {
     if (typeof firebase !== 'undefined') {
         if (!firebase.apps.length) {
@@ -36,9 +46,37 @@ let activeUsersData = {};
 let timerIntervals = {};
 let isFirstLoad = true;
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
     const savedUser = localStorage.getItem('badminton_user');
-    if (savedUser) {
+    if (!savedUser) {
+        return;
+    }
+
+    // ===============================
+    // ตรวจ GPS ก่อนเข้าเว็บ
+    // ===============================
+    const locationAllowed =
+        await checkLocation();
+
+    // ถ้าอยู่นอกสนาม
+    if (!locationAllowed) {
+
+        // ลบ Login ที่จำไว้
+        localStorage.removeItem('badminton_user');
+
+        // ให้กลับไปหน้า Login
+        currentUser = null;
+
+        document
+            .getElementById('loginPage')
+            .classList.remove('hidden');
+
+        document
+            .getElementById('userPage')
+            .classList.add('hidden');
+
+        return;
+    }
         currentUser = JSON.parse(savedUser);
         document.getElementById('loginPage').classList.add('hidden');
         document.getElementById('userPage').classList.remove('hidden');
@@ -49,7 +87,6 @@ window.addEventListener('DOMContentLoaded', () => {
         } else {
             document.getElementById('adminNavBtn').classList.add('hidden');
         }
-    }
 });
 
 if (useFirebase && db) {
@@ -112,6 +149,150 @@ function createEmptyQueues() {
         doneVotes: []
     }));
 }
+// ===============================
+// คำนวณระยะห่างระหว่าง 2 พิกัด
+// ===============================
+function getDistance(lat1, lon1, lat2, lon2) {
+
+    const R = 6371000; // รัศมีโลก หน่วยเมตร
+
+    const toRad = (value) => {
+        return value * Math.PI / 180;
+    };
+
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+
+    const c = 2 * Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a)
+    );
+
+    return R * c;
+}
+// ===============================
+// ตรวจสอบว่าผู้ใช้อยู่ในสนามหรือไม่
+// ===============================
+function checkLocation() {
+
+    return new Promise((resolve) => {
+
+        // ตรวจสอบว่าอุปกรณ์รองรับ GPS หรือไม่
+        if (!navigator.geolocation) {
+
+            alert(
+                'อุปกรณ์นี้ไม่รองรับการระบุตำแหน่ง GPS'
+            );
+
+            resolve(false);
+            return;
+        }
+
+        // ขอพิกัดของผู้ใช้งาน
+        navigator.geolocation.getCurrentPosition(
+
+            // =========================
+            // กรณีตรวจตำแหน่งสำเร็จ
+            // =========================
+            (position) => {
+
+                const userLat =
+                    position.coords.latitude;
+
+                const userLng =
+                    position.coords.longitude;
+
+                // คำนวณระยะห่างจากสนาม
+                const distance = getDistance(
+                    userLat,
+                    userLng,
+                    COURT_LAT,
+                    COURT_LNG
+                );
+
+                console.log(
+                    'Latitude:',
+                    userLat
+                );
+
+                console.log(
+                    'Longitude:',
+                    userLng
+                );
+
+                console.log(
+                    'ระยะห่างจากสนาม:',
+                    distance.toFixed(2),
+                    'เมตร'
+                );
+
+                // =========================
+                // อยู่ในพื้นที่สนาม
+                // =========================
+                if (distance <= ALLOWED_RADIUS) {
+
+                    alert(
+                        '✅ คุณอยู่ในบริเวณสนาม\n' +
+                        'สามารถเข้าใช้งานระบบได้'
+                    );
+
+                    resolve(true);
+
+                }
+
+                // =========================
+                // อยู่นอกพื้นที่สนาม
+                // =========================
+                else {
+
+                    alert(
+                        '❌ คุณอยู่นอกบริเวณสนาม\n\n' +
+                        'ระยะห่างจากสนามประมาณ ' +
+                        distance.toFixed(0) +
+                        ' เมตร\n\n' +
+                        'กรุณาเดินทางมาที่สนามก่อนจึงจะสามารถใช้งานระบบได้'
+                    );
+
+                    resolve(false);
+                }
+            },
+
+            // =========================
+            // กรณีไม่สามารถอ่าน GPS ได้
+            // =========================
+            (error) => {
+
+                console.error(
+                    'GPS Error:',
+                    error
+                );
+
+                alert(
+                    'ไม่สามารถตรวจสอบตำแหน่งของคุณได้\n\n' +
+                    'กรุณาเปิด GPS และอนุญาตให้เว็บไซต์เข้าถึงตำแหน่ง'
+                );
+
+                resolve(false);
+            },
+
+            // =========================
+            // ตั้งค่าการอ่าน GPS
+            // =========================
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    });
+}
 
 async function isUserOnline(username) {
     if (!username || username.toLowerCase() === 'admin') return false;
@@ -129,6 +310,13 @@ async function isUserOnline(username) {
 }
 
 async function handleLogin() {
+    const locationAllowed = await checkLocation();
+
+    // ถ้าอยู่นอกสนาม ให้หยุดการ Login
+    if (!locationAllowed) {
+        return;
+    }
+
     const userVal = document.getElementById('loginUsername').value.trim();
     const passVal = document.getElementById('loginPassword').value.trim();
 
