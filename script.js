@@ -7,7 +7,6 @@ const COURT_LOCATION = {
 
 const ACCURACY_LIMIT_METERS = 300;
 
-// 🛠️ ประกาศตัวแปร Global ไว้ด้านบนสุดเพื่อป้องกัน Error ก่อนใช้งาน
 let currentUser = null;
 let isRegisterMode = false;
 let currentSelectedCourt = '';
@@ -15,7 +14,6 @@ let activeUsersData = {};
 let timerIntervals = {};
 let isFirstLoad = true;
 
-// ฟังก์ชันสร้างคิวว่างเริ่มต้น
 function createEmptyQueues() {
     return [
         { owner: null, players: ['', '', '', ''], timeLeft: 120, doneVotes: [] },
@@ -94,7 +92,6 @@ try {
     console.error("Firebase Initialization Error:", e);
 }
 
-// ฟังก์ชันสลับหน้าจอ Login / Register
 function toggleAuthMode() {
     isRegisterMode = !isRegisterMode;
     const title = document.getElementById('authTitle');
@@ -121,7 +118,6 @@ function toggleAuthMode() {
     }
 }
 
-// ตรวจสอบสถานะ Authentication ของ Firebase แบบ Real-time
 window.addEventListener('DOMContentLoaded', () => {
     if (useFirebase && auth) {
         auth.onAuthStateChanged(async (user) => {
@@ -134,13 +130,13 @@ window.addEventListener('DOMContentLoaded', () => {
                     console.error("ดึงข้อมูลผู้ใช้จาก Database ไม่สำเร็จ:", err);
                 }
 
-                const isAdminEmail = user.email === 'admin@admin.com';
+                const isAdminAccount = userData ? userData.isAdmin : (user.email === 'admin@admin.com');
                 
                 currentUser = {
                     uid: user.uid,
                     email: user.email,
-                    username: userData ? userData.username : (isAdminEmail ? 'Admin' : user.email.split('@')[0]),
-                    isAdmin: userData ? userData.isAdmin : isAdminEmail
+                    username: userData ? userData.username : 'Admin',
+                    isAdmin: isAdminAccount
                 };
 
                 document.getElementById('loginPage').classList.add('hidden');
@@ -151,7 +147,10 @@ window.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('adminNavBtn').classList.remove('hidden');
                 } else {
                     document.getElementById('adminNavBtn').classList.add('hidden');
-                    db.ref(`active_users/${currentUser.uid}`).set(currentUser.username);
+                    // จัดการสถานะออนไลน์ และ ตั้งค่า onDisconnect ให้ลบอัตโนมัติหากหลุดการเชื่อมต่อ
+                    const activeUserRef = db.ref(`active_users/${currentUser.uid}`);
+                    activeUserRef.set(currentUser.username);
+                    activeUserRef.onDisconnect().remove();
                 }
             } else {
                 forceClientLogoutUI();
@@ -160,7 +159,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ฟังก์ชันหลักจัดการ Login / Register
 async function handleAuthAction() {
     const identifier = document.getElementById('loginIdentifier').value.trim();
     const password = document.getElementById('loginPassword').value.trim();
@@ -171,49 +169,36 @@ async function handleAuthAction() {
         return;
     }
 
-    // 1. 👑 กรณีเข้าสู่ระบบเป็น Admin (ข้าม GPS ทันที)
-    if (identifier.toLowerCase() === 'admin' || identifier.toLowerCase() === 'admin@admin.com') {
-        const adminEmail = 'admin@admin.com';
-        if (password !== 'admin@admin1234A') {
-            alert('รหัสผ่าน Admin ไม่ถูกต้อง!');
-            return;
-        }
-        try {
-            const userCredential = await auth.signInWithEmailAndPassword(adminEmail, password);
-            const user = userCredential.user;
-            
-            await db.ref(`users/${user.uid}`).set({
-                username: 'Admin',
-                email: adminEmail,
-                isAdmin: true
+    try {
+        let targetEmail = identifier;
+
+        // ถ้าไม่ใช่ Admin และไม่ใช่ Email ให้หา Email จาก Username ใน Database ก่อน
+        const isAdminAttempt = (identifier.toLowerCase() === 'admin' || identifier.toLowerCase() === 'admin@admin.com');
+
+        if (!isAdminAttempt && !identifier.includes('@')) {
+            const usersRef = db.ref('users');
+            const snapshot = await usersRef.once('value');
+            let foundEmail = null;
+
+            snapshot.forEach((childSnapshot) => {
+                const uData = childSnapshot.val();
+                if (uData.username && uData.username.toLowerCase() === identifier.toLowerCase()) {
+                    foundEmail = uData.email;
+                }
             });
 
-            currentUser = {
-                uid: user.uid,
-                email: adminEmail,
-                username: 'Admin',
-                isAdmin: true
-            };
-
-            document.getElementById('loginPage').classList.add('hidden');
-            document.getElementById('userPage').classList.remove('hidden');
-            document.getElementById('currentUserDisplay').innerText = 'Admin';
-            document.getElementById('adminNavBtn').classList.remove('hidden');
-            return;
-
-        } catch (err) {
-            alert('Admin Login Error: ' + err.message);
-            return;
+            if (!foundEmail) {
+                alert(`ไม่พบชื่อผู้ใช้งาน "${identifier}" ในระบบ กรุณาใช้อีเมลในการเข้าสู่ระบบแทน`);
+                return;
+            }
+            targetEmail = foundEmail;
         }
-    }
 
-    if (isRegisterMode) {
-        // --- โหมดสมัครสมาชิก ---
-        if (!usernameInput) {
-            alert('กรุณากรอกชื่อที่ใช้แสดงในคอร์ทด้วยครับ');
-            return;
-        }
-        try {
+        if (isRegisterMode) {
+            if (!usernameInput) {
+                alert('กรุณากรอกชื่อที่ใช้แสดงในคอร์ทด้วยครับ');
+                return;
+            }
             const userCredential = await auth.createUserWithEmailAndPassword(identifier, password);
             const uid = userCredential.user.uid;
 
@@ -225,72 +210,43 @@ async function handleAuthAction() {
 
             alert('สมัครสมาชิกสำเร็จ!');
             toggleAuthMode();
-        } catch (error) {
-            alert('สมัครสมาชิกไม่สำเร็จ: ' + error.message);
-        }
-    } else {
-        // --- โหมดเข้าสู่ระบบ (ผู้ใช้ทั่วไปต้องเช็ก GPS) ---
-        try {
-            let targetEmail = identifier;
+        } else {
+            // ตรวจสอบว่าเป็น Admin หรือไม่จาก Database โดยตรงหลังจากล็อกอินสำเร็จ
+            // แต่สำหรับผู้ใช้ทั่วไป ต้องเช็ก GPS ก่อน
+            if (!isAdminAttempt) {
+                // แสดงหน้าต่างโหลดพิกัด GPS เพื่อไม่ให้ผู้ใช้คิดว่าเว็บค้าง
+                document.getElementById('loadingModal').classList.remove('hidden');
 
-            if (!identifier.includes('@')) {
-                const usersRef = db.ref('users');
-                const snapshot = await usersRef.once('value');
-                let foundEmail = null;
+                try {
+                    const userLoc = await getUserLocation();
+                    const distance = getDistanceInMeters(userLoc.lat, userLoc.lng, COURT_LOCATION.lat, COURT_LOCATION.lng);
+                    const distanceRounded = Math.round(distance);
+                    const accuracyRounded = Math.round(userLoc.accuracy);
 
-                snapshot.forEach((childSnapshot) => {
-                    const userData = childSnapshot.val();
-                    if (userData.username && userData.username.toLowerCase() === identifier.toLowerCase()) {
-                        foundEmail = userData.email;
+                    document.getElementById('loadingModal').classList.add('hidden');
+
+                    if (userLoc.accuracy > ACCURACY_LIMIT_METERS) {
+                        alert(`⚠️ ไม่สามารถยืนยันตำแหน่งได้แม่นยำพอ (ความคลาดเคลื่อน ±${accuracyRounded} เมตร)\nกรุณาเปิด GPS หรือเชื่อมต่อเน็ตมือถือแล้วลองใหม่`);
+                        return;
                     }
-                });
 
-                if (!foundEmail) {
-                    alert(`ไม่พบชื่อผู้ใช้งาน "${identifier}" ในระบบ กรุณาใช้อีเมลในการเข้าสู่ระบบแทน`);
+                    const effectiveDistance = Math.max(0, distance - userLoc.accuracy);
+                    if (effectiveDistance > COURT_LOCATION.radiusMeters) {
+                        alert(`❌ เข้าสู่ระบบไม่ได้!\nคุณอยู่ห่างจากสนามประมาณ ${distanceRounded} เมตร (ต้องอยู่ในระยะไม่เกิน ${COURT_LOCATION.radiusMeters} เมตร)`);
+                        return;
+                    }
+                } catch (gpsErr) {
+                    document.getElementById('loadingModal').classList.add('hidden');
+                    alert(gpsErr.message);
                     return;
                 }
-                targetEmail = foundEmail;
             }
 
-            // 🔒 ตรวจสอบพิกัด GPS เฉพาะผู้ใช้ทั่วไป
-            const userLoc = await getUserLocation();
-            const distance = getDistanceInMeters(userLoc.lat, userLoc.lng, COURT_LOCATION.lat, COURT_LOCATION.lng);
-            const distanceRounded = Math.round(distance);
-            const accuracyRounded = Math.round(userLoc.accuracy);
-
-            if (userLoc.accuracy > ACCURACY_LIMIT_METERS) {
-                alert(`⚠️ ไม่สามารถยืนยันตำแหน่งได้แม่นยำพอ (ความคลาดเคลื่อน ±${accuracyRounded} เมตร)\nกรุณาเปิด GPS หรือเชื่อมต่อเน็ตมือถือแล้วลองใหม่`);
-                return;
-            }
-
-            const effectiveDistance = Math.max(0, distance - userLoc.accuracy);
-            if (effectiveDistance > COURT_LOCATION.radiusMeters) {
-                alert(`❌ เข้าสู่ระบบไม่ได้!\nคุณอยู่ห่างจากสนามประมาณ ${distanceRounded} เมตร (ต้องอยู่ในระยะไม่เกิน ${COURT_LOCATION.radiusMeters} เมตร)`);
-                return;
-            }
-
-            const userCredential = await auth.signInWithEmailAndPassword(targetEmail, password);
-            const user = userCredential.user;
-
-            const userSnapshot = await db.ref(`users/${user.uid}`).once('value');
-            const userData = userSnapshot.val();
-
-            currentUser = {
-                uid: user.uid,
-                email: user.email,
-                username: userData ? userData.username : user.email.split('@')[0],
-                isAdmin: false
-            };
-
-            document.getElementById('loginPage').classList.add('hidden');
-            document.getElementById('userPage').classList.remove('hidden');
-            document.getElementById('currentUserDisplay').innerText = currentUser.username;
-            document.getElementById('adminNavBtn').classList.add('hidden');
-            db.ref(`active_users/${currentUser.uid}`).set(currentUser.username);
-
-        } catch (error) {
-            alert('เข้าสู่ระบบไม่สำเร็จ: ' + error.message);
+            await auth.signInWithEmailAndPassword(targetEmail, password);
         }
+    } catch (error) {
+        document.getElementById('loadingModal').classList.add('hidden');
+        alert('ดำเนินการไม่สำเร็จ: ' + error.message);
     }
 }
 
