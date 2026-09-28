@@ -13,6 +13,7 @@ let currentSelectedCourt = "";
 let activeUsersData = {};
 let timerIntervals = {};
 let isFirstLoad = true;
+let isRegistering = false; // ตัวแปรเช็คสถานะการสมัครเพื่อกันหน้าเว็บกระพริบ
 
 function createEmptyQueues() {
   return [
@@ -62,11 +63,11 @@ function getUserLocation() {
       (error) => {
         reject(
           new Error(
-            "กรุณาเปิด/อนุญาตสิทธิ์การเข้าถึงตำแหน่ง (Location Access)",
-          ),
+            "กรุณาเปิด/อนุญาตสิทธิ์การเข้าถึงตำแหน่ง (Location Access)"
+          )
         );
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   });
 }
@@ -128,6 +129,9 @@ function toggleAuthMode() {
 window.addEventListener("DOMContentLoaded", () => {
   if (useFirebase && auth) {
     auth.onAuthStateChanged(async (user) => {
+      // ✅ ดักไว้ไม่ให้เปลี่ยนหน้าเว็บ หากกำลังอยู่ในขั้นตอนการสมัครสมาชิก
+      if (isRegistering) return; 
+
       if (user) {
         let userData = null;
         try {
@@ -204,20 +208,25 @@ async function handleAuthAction() {
 
       if (!foundEmail) {
         alert(
-          `ไม่พบชื่อผู้ใช้งาน "${identifier}" ในระบบ กรุณาใช้อีเมลในการเข้าสู่ระบบแทน`,
+          `ไม่พบชื่อผู้ใช้งาน "${identifier}" ในระบบ กรุณาใช้อีเมลในการเข้าสู่ระบบแทน`
         );
         return;
       }
       targetEmail = foundEmail;
     }
+
     if (isRegisterMode) {
       if (!usernameInput) {
         alert("กรุณากรอกชื่อที่ใช้แสดงในคอร์ทด้วยครับ");
         return;
       }
+
+      // ✅ 1. เปิดสถานะกำลังสมัคร เพื่อระงับการเปลี่ยนหน้าเว็บ
+      isRegistering = true;
+
       const userCredential = await auth.createUserWithEmailAndPassword(
         identifier,
-        password,
+        password
       );
       const uid = userCredential.user.uid;
 
@@ -227,8 +236,11 @@ async function handleAuthAction() {
         isAdmin: false,
       });
 
-      // เพิ่มคำสั่งออกจากระบบทันทีหลังจากสมัครเสร็จ
+      // ✅ 2. สั่งออกจากระบบทันที โดยที่หน้าเว็บจะไม่กระพริบไปหน้าจองคอร์ทแล้ว
       await auth.signOut();
+
+      // ✅ 3. ปิดสถานะกำลังสมัคร
+      isRegistering = false;
 
       alert("สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบอีกครั้ง");
       toggleAuthMode();
@@ -245,7 +257,7 @@ async function handleAuthAction() {
             userLoc.lat,
             userLoc.lng,
             COURT_LOCATION.lat,
-            COURT_LOCATION.lng,
+            COURT_LOCATION.lng
           );
           const distanceRounded = Math.round(distance);
           const accuracyRounded = Math.round(userLoc.accuracy);
@@ -254,7 +266,7 @@ async function handleAuthAction() {
 
           if (userLoc.accuracy > ACCURACY_LIMIT_METERS) {
             alert(
-              `⚠️ ไม่สามารถยืนยันตำแหน่งได้แม่นยำพอ (ความคลาดเคลื่อน ±${accuracyRounded} เมตร)\nกรุณาเปิด GPS หรือเชื่อมต่อเน็ตมือถือแล้วลองใหม่`,
+              `⚠️ ไม่สามารถยืนยันตำแหน่งได้แม่นยำพอ (ความคลาดเคลื่อน ±${accuracyRounded} เมตร)\nกรุณาเปิด GPS หรือเชื่อมต่อเน็ตมือถือแล้วลองใหม่`
             );
             return;
           }
@@ -262,7 +274,7 @@ async function handleAuthAction() {
           const effectiveDistance = Math.max(0, distance - userLoc.accuracy);
           if (effectiveDistance > COURT_LOCATION.radiusMeters) {
             alert(
-              `❌ เข้าสู่ระบบไม่ได้!\nคุณอยู่ห่างจากสนามประมาณ ${distanceRounded} เมตร (ต้องอยู่ในระยะไม่เกิน ${COURT_LOCATION.radiusMeters} เมตร)`,
+              `❌ เข้าสู่ระบบไม่ได้!\nคุณอยู่ห่างจากสนามประมาณ ${distanceRounded} เมตร (ต้องอยู่ในระยะไม่เกิน ${COURT_LOCATION.radiusMeters} เมตร)`
             );
             return;
           }
@@ -276,6 +288,8 @@ async function handleAuthAction() {
       await auth.signInWithEmailAndPassword(targetEmail, password);
     }
   } catch (error) {
+    // ✅ เผื่อกรณีเกิด Error ตอนสมัครสมาชิก (เช่น อีเมลซ้ำ) ต้องเคลียร์สถานะคืน
+    isRegistering = false; 
     document.getElementById("loadingModal").classList.add("hidden");
     alert("ดำเนินการไม่สำเร็จ: " + error.message);
   }
@@ -418,7 +432,7 @@ function voteFinishGame(courtName) {
   const players = queue1.players || [];
   if (!players.includes(currentUser.username)) {
     alert(
-      "เฉพาะผู้เล่นที่อยู่ในคิว 1 เท่านั้นที่จะสามารถกดเล่นเสร็จแล้วได้ครับ",
+      "เฉพาะผู้เล่นที่อยู่ในคิว 1 เท่านั้นที่จะสามารถกดเล่นเสร็จแล้วได้ครับ"
     );
     return;
   }
@@ -472,7 +486,7 @@ function shiftQueues(courtName) {
   });
   queues[0].timeLeft = 120;
   const newQueue1Players = (queues[0].players || []).filter(
-    (p) => p !== "",
+    (p) => p !== ""
   ).length;
   if (newQueue1Players > 0 && newQueue1Players < 4) {
     startTimer(courtName, 0);
@@ -502,7 +516,7 @@ function getUserExistingBooking(username) {
 function slotClick(queueIndex, slotIndex) {
   if (currentUser && currentUser.isAdmin) {
     alert(
-      "บัญชี Admin มีไว้สำหรับดูแลและตรวจสอบระบบเท่านั้น ไม่สามารถลงจองเล่นได้",
+      "บัญชี Admin มีไว้สำหรับดูแลและตรวจสอบระบบเท่านั้น ไม่สามารถลงจองเล่นได้"
     );
     return;
   }
@@ -524,7 +538,7 @@ function slotClick(queueIndex, slotIndex) {
   const existingBooking = getUserExistingBooking(currentUser.username);
   if (existingBooking) {
     alert(
-      `คุณมีคิวการเล่นติดอยู่ที่ "${existingBooking.courtName} คิว ${existingBooking.queueIndex}" แล้ว ไม่สามารถจองเพิ่มได้!`,
+      `คุณมีคิวการเล่นติดอยู่ที่ "${existingBooking.courtName} คิว ${existingBooking.queueIndex}" แล้ว ไม่สามารถจองเพิ่มได้!`
     );
     return;
   }
@@ -551,7 +565,7 @@ function removeSinglePlayer(court, queueIndex, slotIndex) {
   queue.players[slotIndex] = "";
   if (queue.doneVotes) {
     const voteIdx = queue.doneVotes.indexOf(
-      currentUser ? currentUser.username : "",
+      currentUser ? currentUser.username : ""
     );
     if (voteIdx > -1) queue.doneVotes.splice(voteIdx, 1);
   }
@@ -591,7 +605,7 @@ function startTimer(court, index) {
     }
 
     const currentPCount = (currentQ.players || []).filter(
-      (p) => p !== "",
+      (p) => p !== ""
     ).length;
     if (currentPCount === 0 || currentPCount === 4) {
       clearTimer(court, index);
@@ -615,7 +629,7 @@ function startTimer(court, index) {
         db.ref(`courts/${court}/${index}`).set(emptyQueue);
       }
       alert(
-        `เวลาครบ 2 นาทีแล้ว คิว 1 ของ ${court} ถูกตัดออกเนื่องจากสมาชิกไม่ครบ 4 คน`,
+        `เวลาครบ 2 นาทีแล้ว คิว 1 ของ ${court} ถูกตัดออกเนื่องจากสมาชิกไม่ครบ 4 คน`
       );
     }
   }, 1000);
@@ -748,7 +762,7 @@ if (useFirebase && db) {
     const finishedInfo = snapshot.val();
     if (finishedInfo && !isFirstLoad) {
       alert(
-        `${finishedInfo.courtName} คิว 1 เล่นจบแมตช์แล้ว ระบบทำการเลื่อนคิวให้อัตโนมัติ`,
+        `${finishedInfo.courtName} คิว 1 เล่นจบแมตช์แล้ว ระบบทำการเลื่อนคิวให้อัตโนมัติ`
       );
     }
     isFirstLoad = false;
