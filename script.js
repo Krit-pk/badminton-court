@@ -865,15 +865,15 @@ if (useFirebase && db) {
 }
 
 function triggerLineGroupAlert(courtName, playersArray) {
-  const gasWebAppUrl =
-    "https://script.google.com/macros/s/AKfycbxuJ6EAtQ7mfeugeQvWCooxyCm5sfueAvvfXJW46rl7L7wF5128Rm005Ns4lyXXUYjFvQ/exec"; // 🔑 เอาลิงก์ /exec ที่ได้มาใส่
+    const gasWebAppUrl = "https://script.google.com/macros/s/AKfycbxHHGT4juH2rYMEiIYKXp_1mZTZe3soKpb26Ok0PEBakwTcZ3a0D_kT1TQ24_RgPNCf5A/exec"; // 🔑 ใส่ลิงก์ /exec ตัวล่าสุด
 
-  fetch(gasWebAppUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      courtName: courtName,
-      players: playersArray,
-    }),
-  }).catch((err) => console.error("LINE Notify Error:", err));
+    fetch(gasWebAppUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            courtName: courtName,
+            players: playersArray
+        })
+    })
+    .catch(err => console.error("LINE Notify Error:", err));
 }
