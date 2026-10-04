@@ -218,6 +218,7 @@
     }
   });
 
+  // 📍 ปรับปรุงฟังก์ชัน handleAuthAction ให้เช็ค GPS ตอนเข้าสู่ระบบ (ยกเว้น Admin)
   async function handleAuthAction() {
     const identifier = document.getElementById("loginIdentifier").value.trim();
     const password = document.getElementById("loginPassword").value.trim();
@@ -233,6 +234,37 @@
       const isAdminAttempt =
         identifier.toLowerCase() === "admin" ||
         identifier.toLowerCase() === "admin@admin.com";
+
+      // 📍 ถ้าไม่ใช่ Admin และไม่ใช่โหมดสมัครสมาชิก ให้เช็คพิกัด GPS ก่อนเข้าสู่ระบบ
+      if (!isAdminAttempt && !isRegisterMode) {
+        document.getElementById("loadingModal").classList.remove("hidden");
+        
+        try {
+          const userLoc = await getUserLocation();
+          document.getElementById("loadingModal").classList.add("hidden");
+
+          if (userLoc.accuracy > ACCURACY_LIMIT_METERS) {
+            alert(`สัญญาณ GPS ของคุณมีความคลาดเคลื่อนสูงเกินไป (${Math.round(userLoc.accuracy)} เมตร) กรุณาย้ายไปยังจุดที่รับสัญญาณได้ดีขึ้น`);
+            return;
+          }
+
+          const distance = getDistanceInMeters(
+            userLoc.lat,
+            userLoc.lng,
+            COURT_LOCATION.lat,
+            COURT_LOCATION.lng
+          );
+
+          if (distance > COURT_LOCATION.radiusMeters) {
+            alert(`คุณอยู่ห่างจากสนามเกินกำหนด (${Math.round(distance)} เมตร) ระบบไม่อนุญาตให้เข้าสู่ระบบนอกพื้นที่สนาม (ต้องอยู่ภายใน ${COURT_LOCATION.radiusMeters} เมตร)`);
+            return;
+          }
+        } catch (gpsErr) {
+          document.getElementById("loadingModal").classList.add("hidden");
+          alert("ไม่สามารถตรวจสอบพิกัด GPS ได้: " + gpsErr.message);
+          return;
+        }
+      }
 
       if (!isAdminAttempt && !identifier.includes("@")) {
         const usersRef = db.ref("users");
