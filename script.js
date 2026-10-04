@@ -14,14 +14,45 @@ let activeUsersData = {};
 let timerIntervals = {};
 let isFirstLoad = true;
 let isRegistering = false; // ตัวแปรเช็คสถานะการสมัครเพื่อกันหน้าเว็บกระพริบ
+let notifiedForCourt = null; // ตัวแปรป้องกันการแจ้งเตือนซ้ำกะพริบรัวๆ
+
+// ==========================================
+// ส่วนของการแจ้งเตือน (Web Notifications API)
+// ==========================================
+
+// ขอสิทธิ์การแจ้งเตือนจากเบราว์เซอร์
+function requestNotificationPermission() {
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}
+
+// ฟังก์ชันสั่งยิงแจ้งเตือน
+function sendTurnNotification(courtName) {
+  const title = "ถึงคิวของคุณแล้ว! 🏸";
+  const options = {
+    body: `เชิญเตรียมตัวที่ ${courtName} คิวที่ 1 ได้เลยครับ`,
+    icon: "https://cdn-icons-png.flaticon.com/512/889/889518.png", // โลโก้การแจ้งเตือน
+    vibrate: [200, 100, 200] // สั่นมือถือ (รองรับเฉพาะ Android)
+  };
+
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(title, options);
+  } else {
+    // สำรองไว้กรณีเขาไม่อนุญาตแจ้งเตือน ให้ใช้ Alert ปกติ
+    alert(`${title}\n${options.body}`);
+  }
+}
+
+// ==========================================
 
 function createEmptyQueues() {
   return [
-    { owner: null, players: ["", "", "", ""], timeLeft: 120, doneVotes: [] },
-    { owner: null, players: ["", "", "", ""], timeLeft: 120, doneVotes: [] },
-    { owner: null, players: ["", "", "", ""], timeLeft: 120, doneVotes: [] },
-    { owner: null, players: ["", "", "", ""], timeLeft: 120, doneVotes: [] },
-    { owner: null, players: ["", "", "", ""], timeLeft: 120, doneVotes: [] },
+    { owner: null, players: ["", "", "", ""], timeLeft: 60, doneVotes: [] },
+    { owner: null, players: ["", "", "", ""], timeLeft: 60, doneVotes: [] },
+    { owner: null, players: ["", "", "", ""], timeLeft: 60, doneVotes: [] },
+    { owner: null, players: ["", "", "", ""], timeLeft: 60, doneVotes: [] },
+    { owner: null, players: ["", "", "", ""], timeLeft: 60, doneVotes: [] },
   ];
 }
 
@@ -154,8 +185,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
         document.getElementById("loginPage").classList.add("hidden");
         document.getElementById("userPage").classList.remove("hidden");
-        document.getElementById("currentUserDisplay").innerText =
-          currentUser.username;
+        document.getElementById("currentUserDisplay").innerText = currentUser.username;
+        
+        // ขออนุญาตแจ้งเตือนเมื่อล็อกอินสำเร็จ
+        requestNotificationPermission();
 
         if (currentUser.isAdmin) {
           document.getElementById("adminNavBtn").classList.remove("hidden");
@@ -245,8 +278,11 @@ async function handleAuthAction() {
       alert("สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบอีกครั้ง");
       toggleAuthMode();
     } else {
-      // ตรวจสอบว่าเป็น Admin หรือไม่จาก Database โดยตรงหลังจากล็อกอินสำเร็จ
-      // แต่สำหรับผู้ใช้ทั่วไป ต้องเช็ก GPS ก่อน
+      
+      // ==========================================
+      // ปิดคำสั่งเช็ค GPS สำหรับการทดสอบชั่วคราว
+      // ==========================================
+      /*
       if (!isAdminAttempt) {
         // แสดงหน้าต่างโหลดพิกัด GPS เพื่อไม่ให้ผู้ใช้คิดว่าเว็บค้าง
         document.getElementById("loadingModal").classList.remove("hidden");
@@ -284,6 +320,8 @@ async function handleAuthAction() {
           return;
         }
       }
+      */
+      // ==========================================
 
       await auth.signInWithEmailAndPassword(targetEmail, password);
     }
@@ -326,6 +364,7 @@ async function handleLogout() {
 
 function forceClientLogoutUI() {
   currentUser = null;
+  notifiedForCourt = null; // รีเซ็ตการแจ้งเตือน
   closePopup();
   document.getElementById("userPage").classList.add("hidden");
   document.getElementById("adminPage").classList.add("hidden");
@@ -466,6 +505,7 @@ function shiftQueues(courtName) {
   clearAllTimersForCourt(courtName);
   const queues = courtData[courtName];
   queues.shift();
+  
   let readyIndex = -1;
   for (let i = 0; i < queues.length; i++) {
     const pCount = (queues[i].players || []).filter((p) => p !== "").length;
@@ -478,13 +518,15 @@ function shiftQueues(courtName) {
     const readyQueue = queues.splice(readyIndex, 1)[0];
     queues.unshift(readyQueue);
   }
+  
   queues.push({
     owner: null,
     players: ["", "", "", ""],
-    timeLeft: 120,
+    timeLeft: 60, // เปลี่ยนเป็น 60
     doneVotes: [],
   });
-  queues[0].timeLeft = 120;
+  queues[0].timeLeft = 60; // เปลี่ยนเป็น 60
+  
   const newQueue1Players = (queues[0].players || []).filter(
     (p) => p !== ""
   ).length;
@@ -550,7 +592,7 @@ function slotClick(queueIndex, slotIndex) {
 
   if (queueIndex === 0) {
     if (prevPlayerCount === 0 && newPlayerCount === 1) {
-      queue.timeLeft = 120;
+      queue.timeLeft = 60; // เปลี่ยนจาก 120 เป็น 60
       startTimer(currentSelectedCourt, 0);
     } else if (newPlayerCount === 4) {
       clearTimer(currentSelectedCourt, 0);
@@ -563,22 +605,37 @@ function removeSinglePlayer(court, queueIndex, slotIndex) {
   const queue = courtData[court][queueIndex];
   if (!queue || !queue.players) return;
   queue.players[slotIndex] = "";
+  
   if (queue.doneVotes) {
     const voteIdx = queue.doneVotes.indexOf(
       currentUser ? currentUser.username : ""
     );
     if (voteIdx > -1) queue.doneVotes.splice(voteIdx, 1);
   }
+  
   const remainingPlayers = queue.players.filter((p) => p !== "");
   if (remainingPlayers.length > 0) {
     queue.owner = remainingPlayers[0];
+    updateCourtToDatabase(court);
   } else {
-    queue.owner = null;
-    queue.timeLeft = 120;
-    queue.doneVotes = [];
-    if (queueIndex === 0) clearTimer(court, 0);
+    // --- จุดที่แก้ไข: เมื่อคิวว่างเปล่า (คนออกจนหมด) ---
+    
+    if (queueIndex === 0) {
+      // กรณีที่ 1: ถ้าเป็นคิว 1 ยกเลิกจนว่าง ให้รัน shiftQueues เพื่อดันคิวข้างล่างขึ้นมาแทนที่ทันที
+      shiftQueues(court);
+    } else {
+      // กรณีที่ 2: ถ้าเป็นคิวอื่นๆ ว่าง (เช่น คิว 2 หรือ 3 คนออกหมด) 
+      // ให้ตัดคิวที่เป็นช่องโหว่ตรงกลางทิ้ง ดันคิวที่เหลือขึ้น และเติมคิวว่างไปต่อท้ายสุด
+      courtData[court].splice(queueIndex, 1);
+      courtData[court].push({
+        owner: null,
+        players: ["", "", "", ""],
+        timeLeft: 60,
+        doneVotes: [],
+      });
+      updateCourtToDatabase(court);
+    }
   }
-  updateCourtToDatabase(court);
 }
 
 function updateCourtToDatabase(court) {
@@ -619,18 +676,12 @@ function startTimer(court, index) {
 
     if (currentQ.timeLeft <= 0) {
       clearTimer(court, index);
-      const emptyQueue = {
-        owner: null,
-        players: ["", "", "", ""],
-        timeLeft: 120,
-        doneVotes: [],
-      };
-      if (useFirebase && db) {
-        db.ref(`courts/${court}/${index}`).set(emptyQueue);
-      }
       alert(
-        `เวลาครบ 2 นาทีแล้ว คิว 1 ของ ${court} ถูกตัดออกเนื่องจากสมาชิกไม่ครบ 4 คน`
+        `เวลาครบ 1 นาทีแล้ว คิว 1 ของ ${court} ถูกตัดออกเนื่องจากสมาชิกไม่ครบ 4 คน`
       );
+      
+      // เรียกใช้ shiftQueues เพื่อเตะคิว 1 ออก และดึงคิว 2 (หรือคิวถัดไปที่เต็ม 4 คน) ขึ้นมาแทนที่อัตโนมัติ
+      shiftQueues(court);
     }
   }, 1000);
 }
@@ -722,16 +773,41 @@ if (useFirebase && db) {
     const data = snapshot.val();
     if (data && Object.keys(data).length > 0) {
       courtData = data;
+      
+      let isMyTurn = false;
+      let myCourtTurn = "";
+
       Object.keys(courtData).forEach((cName) => {
         const q1 = courtData[cName][0];
         const pCount = (q1.players || []).filter((p) => p !== "").length;
+        
         if (pCount === 0 || pCount === 4) {
           clearTimer(cName, 0);
         }
+
+        // เช็คว่าผู้ใช้ล็อกอินอยู่ และไม่ใช่แอดมิน แล้วดูว่าชื่ออยู่ในคิว 1 ของคอร์ทนี้หรือไม่
+        if (currentUser && !currentUser.isAdmin) {
+           if ((q1.players || []).includes(currentUser.username)) {
+               isMyTurn = true;
+               myCourtTurn = cName;
+           }
+        }
       });
+
+      // ระบบแจ้งเตือน
+      if (isMyTurn) {
+          if (notifiedForCourt !== myCourtTurn) {
+              sendTurnNotification(myCourtTurn);
+              notifiedForCourt = myCourtTurn; 
+          }
+      } else {
+          notifiedForCourt = null; 
+      }
+
     } else {
       db.ref("courts").set(courtData);
     }
+    
     if (!document.getElementById("courtModal").classList.contains("hidden")) {
       renderQueues();
     }
