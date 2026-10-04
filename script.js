@@ -34,25 +34,28 @@ function sendTurnNotification(courtName, targetUserFcmToken) {
 
   // สำรองไว้กรณีเขาเล่นบนเว็บปกติที่เปิดจออยู่
   if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(title, { body: body, icon: "https://cdn-icons-png.flaticon.com/512/889/889518.png" });
+    new Notification(title, {
+      body: body,
+      icon: "https://cdn-icons-png.flaticon.com/512/889/889518.png",
+    });
   }
 
   // ถ้าระบบมี FCM Token ของเขา (ได้มาจากข้อ 3 ในคำตอบที่แล้ว) ให้ยิงแจ้งเตือนมือถือ
   if (targetUserFcmToken) {
     const gasUrl = "https://script.google.com/macros/s/YOUR_WEB_APP_ID/exec"; // เอา URL จาก Apps Script มาใส่ตรงนี้
-    
+
     fetch(gasUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         to: targetUserFcmToken,
         title: title,
-        body: body
-      })
+        body: body,
+      }),
     })
-    .then(response => response.json())
-    .then(data => console.log("ยิงแจ้งเตือนผ่าน GAS สำเร็จ:", data))
-    .catch(error => console.error("แจ้งเตือน Error:", error));
+      .then((response) => response.json())
+      .then((data) => console.log("ยิงแจ้งเตือนผ่าน GAS สำเร็จ:", data))
+      .catch((error) => console.error("แจ้งเตือน Error:", error));
   }
 }
 
@@ -106,11 +109,11 @@ function getUserLocation() {
       (error) => {
         reject(
           new Error(
-            "กรุณาเปิด/อนุญาตสิทธิ์การเข้าถึงตำแหน่ง (Location Access)"
-          )
+            "กรุณาเปิด/อนุญาตสิทธิ์การเข้าถึงตำแหน่ง (Location Access)",
+          ),
         );
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   });
 }
@@ -173,7 +176,7 @@ window.addEventListener("DOMContentLoaded", () => {
   if (useFirebase && auth) {
     auth.onAuthStateChanged(async (user) => {
       // ✅ ดักไว้ไม่ให้เปลี่ยนหน้าเว็บ หากกำลังอยู่ในขั้นตอนการสมัครสมาชิก
-      if (isRegistering) return; 
+      if (isRegistering) return;
 
       if (user) {
         let userData = null;
@@ -197,8 +200,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
         document.getElementById("loginPage").classList.add("hidden");
         document.getElementById("userPage").classList.remove("hidden");
-        document.getElementById("currentUserDisplay").innerText = currentUser.username;
-        
+        document.getElementById("currentUserDisplay").innerText =
+          currentUser.username;
+
         // ขออนุญาตแจ้งเตือนเมื่อล็อกอินสำเร็จ
         requestNotificationPermission();
 
@@ -253,7 +257,7 @@ async function handleAuthAction() {
 
       if (!foundEmail) {
         alert(
-          `ไม่พบชื่อผู้ใช้งาน "${identifier}" ในระบบ กรุณาใช้อีเมลในการเข้าสู่ระบบแทน`
+          `ไม่พบชื่อผู้ใช้งาน "${identifier}" ในระบบ กรุณาใช้อีเมลในการเข้าสู่ระบบแทน`,
         );
         return;
       }
@@ -271,7 +275,7 @@ async function handleAuthAction() {
 
       const userCredential = await auth.createUserWithEmailAndPassword(
         identifier,
-        password
+        password,
       );
       const uid = userCredential.user.uid;
 
@@ -290,7 +294,6 @@ async function handleAuthAction() {
       alert("สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบอีกครั้ง");
       toggleAuthMode();
     } else {
-      
       // ==========================================
       // ปิดคำสั่งเช็ค GPS สำหรับการทดสอบชั่วคราว
       // ==========================================
@@ -339,7 +342,7 @@ async function handleAuthAction() {
     }
   } catch (error) {
     // ✅ เผื่อกรณีเกิด Error ตอนสมัครสมาชิก (เช่น อีเมลซ้ำ) ต้องเคลียร์สถานะคืน
-    isRegistering = false; 
+    isRegistering = false;
     document.getElementById("loadingModal").classList.add("hidden");
     alert("ดำเนินการไม่สำเร็จ: " + error.message);
   }
@@ -483,7 +486,7 @@ function voteFinishGame(courtName) {
   const players = queue1.players || [];
   if (!players.includes(currentUser.username)) {
     alert(
-      "เฉพาะผู้เล่นที่อยู่ในคิว 1 เท่านั้นที่จะสามารถกดเล่นเสร็จแล้วได้ครับ"
+      "เฉพาะผู้เล่นที่อยู่ในคิว 1 เท่านั้นที่จะสามารถกดเล่นเสร็จแล้วได้ครับ",
     );
     return;
   }
@@ -517,7 +520,7 @@ function shiftQueues(courtName) {
   clearAllTimersForCourt(courtName);
   const queues = courtData[courtName];
   queues.shift();
-  
+
   let readyIndex = -1;
   for (let i = 0; i < queues.length; i++) {
     const pCount = (queues[i].players || []).filter((p) => p !== "").length;
@@ -530,7 +533,7 @@ function shiftQueues(courtName) {
     const readyQueue = queues.splice(readyIndex, 1)[0];
     queues.unshift(readyQueue);
   }
-  
+
   queues.push({
     owner: null,
     players: ["", "", "", ""],
@@ -538,9 +541,9 @@ function shiftQueues(courtName) {
     doneVotes: [],
   });
   queues[0].timeLeft = 60; // เปลี่ยนเป็น 60
-  
+
   const newQueue1Players = (queues[0].players || []).filter(
-    (p) => p !== ""
+    (p) => p !== "",
   ).length;
   if (newQueue1Players > 0 && newQueue1Players < 4) {
     startTimer(courtName, 0);
@@ -570,7 +573,7 @@ function getUserExistingBooking(username) {
 function slotClick(queueIndex, slotIndex) {
   if (currentUser && currentUser.isAdmin) {
     alert(
-      "บัญชี Admin มีไว้สำหรับดูแลและตรวจสอบระบบเท่านั้น ไม่สามารถลงจองเล่นได้"
+      "บัญชี Admin มีไว้สำหรับดูแลและตรวจสอบระบบเท่านั้น ไม่สามารถลงจองเล่นได้",
     );
     return;
   }
@@ -592,7 +595,7 @@ function slotClick(queueIndex, slotIndex) {
   const existingBooking = getUserExistingBooking(currentUser.username);
   if (existingBooking) {
     alert(
-      `คุณมีคิวการเล่นติดอยู่ที่ "${existingBooking.courtName} คิว ${existingBooking.queueIndex}" แล้ว ไม่สามารถจองเพิ่มได้!`
+      `คุณมีคิวการเล่นติดอยู่ที่ "${existingBooking.courtName} คิว ${existingBooking.queueIndex}" แล้ว ไม่สามารถจองเพิ่มได้!`,
     );
     return;
   }
@@ -617,26 +620,26 @@ function removeSinglePlayer(court, queueIndex, slotIndex) {
   const queue = courtData[court][queueIndex];
   if (!queue || !queue.players) return;
   queue.players[slotIndex] = "";
-  
+
   if (queue.doneVotes) {
     const voteIdx = queue.doneVotes.indexOf(
-      currentUser ? currentUser.username : ""
+      currentUser ? currentUser.username : "",
     );
     if (voteIdx > -1) queue.doneVotes.splice(voteIdx, 1);
   }
-  
+
   const remainingPlayers = queue.players.filter((p) => p !== "");
   if (remainingPlayers.length > 0) {
     queue.owner = remainingPlayers[0];
     updateCourtToDatabase(court);
   } else {
     // --- จุดที่แก้ไข: เมื่อคิวว่างเปล่า (คนออกจนหมด) ---
-    
+
     if (queueIndex === 0) {
       // กรณีที่ 1: ถ้าเป็นคิว 1 ยกเลิกจนว่าง ให้รัน shiftQueues เพื่อดันคิวข้างล่างขึ้นมาแทนที่ทันที
       shiftQueues(court);
     } else {
-      // กรณีที่ 2: ถ้าเป็นคิวอื่นๆ ว่าง (เช่น คิว 2 หรือ 3 คนออกหมด) 
+      // กรณีที่ 2: ถ้าเป็นคิวอื่นๆ ว่าง (เช่น คิว 2 หรือ 3 คนออกหมด)
       // ให้ตัดคิวที่เป็นช่องโหว่ตรงกลางทิ้ง ดันคิวที่เหลือขึ้น และเติมคิวว่างไปต่อท้ายสุด
       courtData[court].splice(queueIndex, 1);
       courtData[court].push({
@@ -674,7 +677,7 @@ function startTimer(court, index) {
     }
 
     const currentPCount = (currentQ.players || []).filter(
-      (p) => p !== ""
+      (p) => p !== "",
     ).length;
     if (currentPCount === 0 || currentPCount === 4) {
       clearTimer(court, index);
@@ -689,9 +692,9 @@ function startTimer(court, index) {
     if (currentQ.timeLeft <= 0) {
       clearTimer(court, index);
       alert(
-        `เวลาครบ 1 นาทีแล้ว คิว 1 ของ ${court} ถูกตัดออกเนื่องจากสมาชิกไม่ครบ 4 คน`
+        `เวลาครบ 1 นาทีแล้ว คิว 1 ของ ${court} ถูกตัดออกเนื่องจากสมาชิกไม่ครบ 4 คน`,
       );
-      
+
       // เรียกใช้ shiftQueues เพื่อเตะคิว 1 ออก และดึงคิว 2 (หรือคิวถัดไปที่เต็ม 4 คน) ขึ้นมาแทนที่อัตโนมัติ
       shiftQueues(court);
     }
@@ -785,41 +788,45 @@ if (useFirebase && db) {
     const data = snapshot.val();
     if (data && Object.keys(data).length > 0) {
       courtData = data;
-      
+
       let isMyTurn = false;
       let myCourtTurn = "";
 
       Object.keys(courtData).forEach((cName) => {
         const q1 = courtData[cName][0];
         const pCount = (q1.players || []).filter((p) => p !== "").length;
-        
+
         if (pCount === 0 || pCount === 4) {
           clearTimer(cName, 0);
         }
 
         // เช็คว่าผู้ใช้ล็อกอินอยู่ และไม่ใช่แอดมิน แล้วดูว่าชื่ออยู่ในคิว 1 ของคอร์ทนี้หรือไม่
         if (currentUser && !currentUser.isAdmin) {
-           if ((q1.players || []).includes(currentUser.username)) {
-               isMyTurn = true;
-               myCourtTurn = cName;
-           }
+          if ((q1.players || []).includes(currentUser.username)) {
+            isMyTurn = true;
+            myCourtTurn = cName;
+          }
         }
       });
 
-      // ระบบแจ้งเตือน
+      // ในส่วนของ Firebase real-time listener (if (useFirebase && db))
       if (isMyTurn) {
-          if (notifiedForCourt !== myCourtTurn) {
-              sendTurnNotification(myCourtTurn);
-              notifiedForCourt = myCourtTurn; 
-          }
-      } else {
-          notifiedForCourt = null; 
-      }
+        if (notifiedForCourt !== myCourtTurn) {
+          sendTurnNotification(myCourtTurn); // แจ้งเตือนบนหน้าเว็บ (ถ้าเปิดอยู่)
 
+          // 🚨 สั่งยิงข้อความเข้ากลุ่ม LINE อัตโนมัติทันทีที่ขึ้นคิว 1
+          const currentQueuePlayers = courtData[myCourtTurn][0].players;
+          triggerLineGroupAlert(myCourtTurn, currentQueuePlayers);
+
+          notifiedForCourt = myCourtTurn;
+        }
+      } else {
+        notifiedForCourt = null;
+      }
     } else {
       db.ref("courts").set(courtData);
     }
-    
+
     if (!document.getElementById("courtModal").classList.contains("hidden")) {
       renderQueues();
     }
@@ -850,35 +857,23 @@ if (useFirebase && db) {
     const finishedInfo = snapshot.val();
     if (finishedInfo && !isFirstLoad) {
       alert(
-        `${finishedInfo.courtName} คิว 1 เล่นจบแมตช์แล้ว ระบบทำการเลื่อนคิวให้อัตโนมัติ`
+        `${finishedInfo.courtName} คิว 1 เล่นจบแมตช์แล้ว ระบบทำการเลื่อนคิวให้อัตโนมัติ`,
       );
     }
     isFirstLoad = false;
   });
 }
 
-// ประกาศตัวแปร messaging
-let messaging = null;
-if (useFirebase && firebase.messaging.isSupported()) {
-  messaging = firebase.messaging();
-}
+function triggerLineGroupAlert(courtName, playersArray) {
+  const gasWebAppUrl =
+    "https://script.google.com/macros/s/AKfycbxuJ6EAtQ7mfeugeQvWCooxyCm5sfueAvvfXJW46rl7L7wF5128Rm005Ns4lyXXUYjFvQ/exec"; // 🔑 เอาลิงก์ /exec ที่ได้มาใส่
 
-// ฟังก์ชันขอ Token จากเครื่องผู้ใช้
-async function requestFCMToken() {
-  if (!messaging) return;
-  try {
-    // เอา VAPID Key จากขั้นตอนที่ 2 มาใส่ตรงนี้
-    const currentToken = await messaging.getToken({ vapidKey: 'BOTugwlGZ8m_2nB9wgp4z5aSZWcZzP8MEgiPUNd1EwF-1IrUruBVnOyoiyAp4EQ9OfR0uHahwQ4sZtXlgJH7XX4' });
-    
-    if (currentToken) {
-      // บันทึก Token ลงใน Database ของผู้ใช้คนนั้น
-      if (currentUser && currentUser.uid) {
-        db.ref(`users/${currentUser.uid}/fcmToken`).set(currentToken);
-      }
-    } else {
-      console.log('No registration token available.');
-    }
-  } catch (err) {
-    console.error('An error occurred while retrieving token. ', err);
-  }
+  fetch(gasWebAppUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      courtName: courtName,
+      players: playersArray,
+    }),
+  }).catch((err) => console.error("LINE Notify Error:", err));
 }
