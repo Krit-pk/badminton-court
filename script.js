@@ -28,19 +28,31 @@ function requestNotificationPermission() {
 }
 
 // ฟังก์ชันสั่งยิงแจ้งเตือน
-function sendTurnNotification(courtName) {
+function sendTurnNotification(courtName, targetUserFcmToken) {
   const title = "ถึงคิวของคุณแล้ว! 🏸";
-  const options = {
-    body: `เชิญเตรียมตัวที่ ${courtName} คิวที่ 1 ได้เลยครับ`,
-    icon: "https://cdn-icons-png.flaticon.com/512/889/889518.png", // โลโก้การแจ้งเตือน
-    vibrate: [200, 100, 200] // สั่นมือถือ (รองรับเฉพาะ Android)
-  };
+  const body = `เชิญเตรียมตัวที่ ${courtName} คิวที่ 1 ได้เลยครับ`;
 
+  // สำรองไว้กรณีเขาเล่นบนเว็บปกติที่เปิดจออยู่
   if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(title, options);
-  } else {
-    // สำรองไว้กรณีเขาไม่อนุญาตแจ้งเตือน ให้ใช้ Alert ปกติ
-    alert(`${title}\n${options.body}`);
+    new Notification(title, { body: body, icon: "https://cdn-icons-png.flaticon.com/512/889/889518.png" });
+  }
+
+  // ถ้าระบบมี FCM Token ของเขา (ได้มาจากข้อ 3 ในคำตอบที่แล้ว) ให้ยิงแจ้งเตือนมือถือ
+  if (targetUserFcmToken) {
+    const gasUrl = "https://script.google.com/macros/s/YOUR_WEB_APP_ID/exec"; // เอา URL จาก Apps Script มาใส่ตรงนี้
+    
+    fetch(gasUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: targetUserFcmToken,
+        title: title,
+        body: body
+      })
+    })
+    .then(response => response.json())
+    .then(data => console.log("ยิงแจ้งเตือนผ่าน GAS สำเร็จ:", data))
+    .catch(error => console.error("แจ้งเตือน Error:", error));
   }
 }
 
@@ -843,4 +855,30 @@ if (useFirebase && db) {
     }
     isFirstLoad = false;
   });
+}
+
+// ประกาศตัวแปร messaging
+let messaging = null;
+if (useFirebase && firebase.messaging.isSupported()) {
+  messaging = firebase.messaging();
+}
+
+// ฟังก์ชันขอ Token จากเครื่องผู้ใช้
+async function requestFCMToken() {
+  if (!messaging) return;
+  try {
+    // เอา VAPID Key จากขั้นตอนที่ 2 มาใส่ตรงนี้
+    const currentToken = await messaging.getToken({ vapidKey: 'BOTugwlGZ8m_2nB9wgp4z5aSZWcZzP8MEgiPUNd1EwF-1IrUruBVnOyoiyAp4EQ9OfR0uHahwQ4sZtXlgJH7XX4' });
+    
+    if (currentToken) {
+      // บันทึก Token ลงใน Database ของผู้ใช้คนนั้น
+      if (currentUser && currentUser.uid) {
+        db.ref(`users/${currentUser.uid}/fcmToken`).set(currentToken);
+      }
+    } else {
+      console.log('No registration token available.');
+    }
+  } catch (err) {
+    console.error('An error occurred while retrieving token. ', err);
+  }
 }
